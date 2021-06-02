@@ -37,6 +37,8 @@ if __name__ == '__main__':
             results = faceMesh.process(image)
             image = cv2.cvtColor(image, cv2.COLOR_RGB2BGR)
 
+            image = np.zeros((imgSize_y,imgSize_x), np.uint8 )
+
             if results.multi_face_landmarks:
                 cv2.putText(image, "Found Face", (20, 20), 0, 0.6, (255, 30, 30))
             else:
@@ -47,10 +49,11 @@ if __name__ == '__main__':
                     break
                 continue
 
+            # draw faceMesh landmark
             for landmarks in results.multi_face_landmarks:
                 for i in range(0, 468):
                     pixelPos = GetImgPos(i, landmarks)
-                    #cv2.circle(image, (pixelPos[0], pixelPos[1]), 2, (100, 0, 0), 0)
+                    cv2.circle(image, (pixelPos[0], pixelPos[1]), 1, (100, 0, 0), 1)
 
             # Gaze recognition
             for landmarks in results.multi_face_landmarks:
@@ -71,40 +74,44 @@ if __name__ == '__main__':
 
                 # 크롭
                 leftEye_crop = frame[leftEye_top[1]:leftEye_bottom[1], leftEye_left[0]:leftEye_right[0]]
-
-                r = 200. / leftEye_crop.shape[1]
-                dim = (200, int(leftEye_crop.shape[0] * r))
-                leftEye_crop = cv2.resize(leftEye_crop, dim, interpolation=cv2.INTER_AREA)
+                crop_size = leftEye_crop.shape
+                r = 200. / crop_size[1]
+                dim = (200, int(crop_size[0] * r))
+                leftEye_crop= cv2.resize(leftEye_crop, dim, interpolation=cv2.INTER_AREA)
+                crop_size = leftEye_crop.shape
+                black = np.zeros((crop_size[0],crop_size[1]), np.uint8)
+                leftEye_crop_draw = cv2.cvtColor(black,cv2.COLOR_GRAY2RGB)
 
                 # 그레이
                 leftEye_crop_gray = cv2.cvtColor(leftEye_crop, cv2.COLOR_BGR2GRAY)
                 # 블러
-                #leftEye_crop_gray = cv2.GaussianBlur(leftEye_crop_gray, (7, 7), 0)
-                leftEye_crop_gray = cv2.bilateralFilter(leftEye_crop_gray, 9, 75, 75)
+                leftEye_crop_gray = cv2.GaussianBlur(leftEye_crop_gray, (7, 7), 0)
+                #leftEye_crop_gray = cv2.bilateralFilter(leftEye_crop_gray, 9, 75, 75)
 
                 # 이진화
-                _, threshold = cv2.threshold(leftEye_crop_gray, 80, 255, cv2.THRESH_BINARY_INV)
+                _, threshold = cv2.threshold(leftEye_crop_gray, 70, 255, cv2.THRESH_BINARY_INV)
 
                 # 외곽선 추출
                 contours, _ = cv2.findContours(threshold, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
                 contours = sorted(contours, key=lambda x: cv2.contourArea(x), reverse=True)
                 rows, cols, _ = leftEye_crop.shape
+
                 for cnt in contours:
-                    cv2.drawContours(leftEye_crop, [cnt], -1, (0, 0, 255), 1)
+                    cv2.drawContours(leftEye_crop_draw, [cnt], -1, (0, 0, 255), 1)
                     (x, y, w, h) = cv2.boundingRect(cnt)
-                    #cv2.rectangle(leftEye_crop, (x, y), (x + w, y + h), (255, 0, 0), 2)
-                    print(h)
+
                     if (h<=15) | (h/w < 0.2): break
                     centerPosition = (x + int(w / 2),y + int(h / 2))
-                    cv2.circle(leftEye_crop, centerPosition, int(w/2), (255, 0, 0), 2)
-                    cv2.line(leftEye_crop, (x + int(w / 2), 0), (x + int(w / 2), rows), (0, 255, 0), 2)
-                    cv2.line(leftEye_crop,
+                    cv2.rectangle(leftEye_crop_draw, (x, y), (x + w, y + h), (255, 0, 0), 2)
+                    cv2.line(leftEye_crop_draw, (x + int(w / 2), 0), (x + int(w / 2), rows), (0, 255, 0), 2)
+                    cv2.line(leftEye_crop_draw,
                              (0, y + int(h / 2)),
                              (cols, y + int(h / 2)),
                              (0, 255, 0), 2)
                     break;
 
             cv2.imshow("Crop", leftEye_crop)
+            cv2.imshow("Cal", leftEye_crop_draw)
             cv2.imshow("Threshold", threshold)
             cv2.imshow("leftEye", leftEye_crop_gray)
             cv2.imshow("image", image)
